@@ -1,19 +1,9 @@
 #!/bin/bash
-# =============================================================
-# The MIT License (MIT)
-#
-# Copyright (c) 2017 Feral Interactive Limited
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 # =============================================================
 # sysreport.sh - Script to gather data about the current system
 #
-# USAGE: $ sysreport.sh <game install root> <output file>
+# USAGE: $ sysreport.sh
 #
 # This will gather a selection of info:
 ## hardware details
@@ -21,13 +11,13 @@
 ## drivers
 ## environment
 ## running programs
-## installed game files
-## feral preference files
-## crash dumps
 #
 # If you're unhappy sharing any of this information then feel
 # free to remove it from the output when sending the file over
 # =============================================================
+
+# This is to avoid problems with getting paths
+CDPATH=
 
 # Force C locale to avoid some odd issues
 export LC_ALL_OLD=$LC_ALL
@@ -37,35 +27,18 @@ export LC_ALL=C
 export SAVED_LD_LIBRARY_PATH=$LD_LIBRARY_PATH
 unset LD_LIBRARY_PATH
 
-INSTALLDIR="$1"
-OUTFILE="$( cd "$( dirname "$2" )" || exit; pwd )/$( basename "$2" )"
-SKIP_CLOSE=$3
+OUTFILE="$(pwd)/sysrep.html"
+SKIP_CLOSE=$2
 
-
-# Attempt to find the feral preferences directory
-FERAL_PREFS="$XDG_DATA_HOME/feral-interactive"
-if [ ! -d "$FERAL_PREFS" ]; then
-	FERAL_PREFS="$HOME/.local/share/feral-interactive"
-fi
 
 # --------------------------------------------------------------------------------
 # Helper functions
 output_text() {
 	echo "$1"
 	echo "<h3 id=\"$1\">$1</h3>" >> "$OUTFILE"
-} 
+}
 
 # --------------------------------------------------------------------------------
-# Verify inputs
-if [ ! -n "$OUTFILE" ] || [ ! -n "$INSTALLDIR" ]; then
-	echo "USAGE: \$ $0 <game install root> <output file>"
-	exit 1
-fi
-if [ ! -d "$INSTALLDIR" ]; then
-	echo "$INSTALLDIR not found, game install missing?"
-	exit 1
-fi
-
 # Check we can write to the output
 echo "-" > "$OUTFILE"
 WRITE_ERROR=$?
@@ -78,11 +51,11 @@ TEXT_AREA="<textarea rows=\"5\" readonly>"
 
 # --------------------------------------------------------------------------------
 # Set up the header
-echo "Reporting with $INSTALLDIR to $OUTFILE"
+echo "Reporting to $OUTFILE"
 echo "<!DOCTYPE html>
 <html>
 <head>
-<title>Feral System Report</title>
+<title>Domesticated System Report</title>
 <style>
 textarea {
     width:90%;
@@ -91,22 +64,19 @@ textarea {
 </style>
 </head>
 <body>
-<h1>Feral System Report</h1>
+<h1>Domesticated System Report</h1>
 <p>Generated using '\$ $0 $*' at $(date)</p>
 <hr>
 <h3>Contents</h3>
 <p>
 <a href=\"#programs\">Program Outputs</a><br>
 <a href=\"#graphics\">Program Outputs</a><br>
-<a href=\"#system\">System Files</a><br>
-<a href=\"#installed\">Installed Files</a><br>
-<a href=\"#preferences\">Preferences</a><br>
-<a href=\"#crashes\">Crashes</a><br>" > "$OUTFILE"
+<a href=\"#system\">System Files</a><br>" > "$OUTFILE"
 
-# Add a tag for steam DLC info if we're appending it to the end
-if [ "$PGOW_APPEND" = "1" ]; then
-	echo "<a href=\"#steamdlc\">Steam DLC Info</a><br>" >> "$OUTFILE"
-fi
+# # Add a tag for steam DLC info if we're appending it to the end
+# if [ "$PGOW_APPEND" = "1" ]; then
+# 	echo "<a href=\"#steamdlc\">Steam DLC Info</a><br>" >> "$OUTFILE"
+# fi
 
 echo "</p>" >> "$OUTFILE"
 
@@ -206,88 +176,6 @@ for FILE do
 	else
 		output_text "$FILE not found"
 	fi
-done
-
-
-# --------------------------------------------------------------------------------
-# System info utilities - game environment
-# --------------------------------------------------------------------------------
-# "ldd -v"    - Check which libraries are likely loaded by binaries
-cd "$INSTALLDIR" || exit
-for BINARYFILE in bin/* lib/*
-do
-	output_text "ldd -v $BINARYFILE"
-	echo "${TEXT_AREA}" >> "$OUTFILE"
-	env LD_LIBRARY_PATH="${SAVED_LD_LIBRARY_PATH}" ldd -v "$BINARYFILE" 2>&1 | tail -n 1000 | tee -a "$OUTFILE" | 
-	if [ "$(wc -l)" = "1000" ]; then 
-		echo "...truncated to last 1000 lines..." >> "$OUTFILE" 
-	fi
-	echo "</textarea>" >> "$OUTFILE"
-done
-
-
-
-# --------------------------------------------------------------------------------
-# "ls -lRh"            - full information on current installed game files
-echo "<hr><h2 id=\"installed\">Installed Files</h2>" >> "$OUTFILE"
-cd "$INSTALLDIR" || exit
-output_text "ls -lRh in '$INSTALLDIR'"
-# shellcheck disable=SC2129
-echo "${TEXT_AREA}" >> "$OUTFILE"
-ls -lRh >> "$OUTFILE" 2>&1
-echo "</textarea>" >> "$OUTFILE"
-
-# "$INSTALLDIR/*.sh"                 - Launch script(s)
-# "$INSTALLDIR/share/*.json"         - Configuration JSON files
-# "$INSTALLDIR/share/*.xml"          - Configuration XML files
-# "$INSTALLDIR/share/*.txt"          - Configuration TXT files
-cd "$INSTALLDIR" || exit
-for FILE in *.sh share/*.json share/*.xml share/*.txt
-do
-	output_text "'$FILE' in '$INSTALLDIR'"
-	echo "${TEXT_AREA}" >> "$OUTFILE"
-	head "$FILE" -n 500 | tee -a "$OUTFILE" | 
-	if [ "$(wc -l)" = "500" ]; 
-		then echo "...truncated..." >> "$OUTFILE"
-	fi
-	echo "</textarea>" >> "$OUTFILE"
-done
-
-# --------------------------------------------------------------------------------
-# "$FERAL_PREFS/*/preferences"       - Preferences files
-echo "<hr><h2 id=\"preferences\">Preferences</h2>" >> "$OUTFILE"
-cd "$FERAL_PREFS" || exit
-for FILE in */preferences
-do
-	output_text "'$FILE' in '$FERAL_PREFS'"
-	echo "${TEXT_AREA}" >> "$OUTFILE"
-	head "$FILE" -n 500 | tee -a "$OUTFILE" | 
-	if [ "$(wc -l)" = "500" ]; 
-		then echo "...truncated..." >> "$OUTFILE"
-	fi
-	echo "</textarea>" >> "$OUTFILE"
-done
-
-
-# --------------------------------------------------------------------------------
-# "$FERAL_PREFS/*/crashes"       - Crash dumps
-echo "<hr><h2 id=\"crashes\">Crashes</h2>" >> "$OUTFILE"
-cd "$FERAL_PREFS" || exit
-for FILE in */crashes/*.dmp */crashes/archived/*.dmp
-do
-	# Ignore old crash logs. They can make the report too big to email
-	# easily if there are too many of them, and they may no longer be
-	# relevant given software updates.
-	[[ $(date +%s -r "$FILE") -lt $(date +%s --date="2 weeks ago") ]] && continue
-
-	output_text "'$FILE' in '$FERAL_PREFS'"
-	echo "<a download=\""$(basename "$FILE")"\"">> "$OUTFILE"
-	echo "href=\"data:application/x-dmp; charset=binary;base64," >> "$OUTFILE"
-	base64 -w1024 "$FILE" >> "$OUTFILE"
-	echo "\">" >> "$OUTFILE"
-	date -I'minutes' -r "$FILE" >> "$OUTFILE"
-	basename "$FILE" .dmp >> "$OUTFILE"
-	echo "</a><br>" >> "$OUTFILE"
 done
 
 # --------------------------------------------------------------------------------
