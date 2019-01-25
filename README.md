@@ -9,5 +9,5 @@ Usage
 ------
 
 ```bash
-./sysreport.sh "/path/to/outputfile.html"
+./sysreport.sh
 ```
