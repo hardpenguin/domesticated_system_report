@@ -70,7 +70,7 @@ textarea {
 <h3>Contents</h3>
 <p>
 <a href=\"#programs\">Program Outputs</a><br>
-<a href=\"#graphics\">Program Outputs</a><br>
+<a href=\"#graphics\">Graphics Information</a><br>
 <a href=\"#system\">System Files</a><br>" > "$OUTFILE"
 
 # # Add a tag for steam DLC info if we're appending it to the end
